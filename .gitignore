@@ -1,0 +1,4 @@
+# per-machine, not version-controlled
+.env
+manifest.conf
+.claude/
