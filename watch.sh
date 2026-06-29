@@ -111,13 +111,14 @@ main() {
 
   local -a M_TYPE M_ROLE M_TARGET M_LABEL
   local type role target label
+  local n=0
   while read -r type role target label; do
     case "$type" in ''|\#*) continue ;; esac
     [ -z "$target" ] && continue
     M_TYPE+=("$type"); M_ROLE+=("$role"); M_TARGET+=("$target"); M_LABEL+=("$label")
+    n=$((n+1))
   done < "$MANIFEST"
 
-  local n=${#M_TARGET[@]}
   [ "$n" -gt 0 ] || fail_hard "manifest has no entries: $MANIFEST"
 
   WORKDIR="$(mktemp -d)" || fail_hard "mktemp failed"
@@ -176,8 +177,9 @@ main() {
 
   # ---- aggregate ----
   local alive=0 subs=0 recv=0 memmax=0
-  local -a ALERTS
-  local lbl a
+  local ALERTS_FILE="$WORKDIR/alerts"
+  : > "$ALERTS_FILE"
+  local lbl
   for ((i=0; i<n; i++)); do
     [ "${STATUS[$i]}" = "ALIVE" ] && alive=$((alive+1))
     [ "${M_ROLE[$i]}" = "sub" ] && subs=$((subs+1))
@@ -188,14 +190,14 @@ main() {
 
     lbl="${M_LABEL[$i]} ${M_ROLE[$i]}"
     case "${STATUS[$i]}" in
-      MISSING) ALERTS+=("[MISS]  $lbl  (no tmux target)") ;;
-      DEAD)    ALERTS+=("[DEAD]  $lbl  (pane back to shell)") ;;
+      MISSING) echo "[MISS]  $lbl  (no tmux target)" >> "$ALERTS_FILE" ;;
+      DEAD)    echo "[DEAD]  $lbl  (pane back to shell)" >> "$ALERTS_FILE" ;;
       ALIVE)
         if [ "${RECV[$i]}" = "STALL" ]; then
-          ALERTS+=("[STALL] $lbl  no new line in ${WAIT_SECONDS}s")
+          echo "[STALL] $lbl  no new line in ${WAIT_SECONDS}s" >> "$ALERTS_FILE"
         fi
         if [ -n "${RSS[$i]}" ] && rss_exceeds "${RSS[$i]}" "$MEM_THRESHOLD_MB"; then
-          ALERTS+=("[MEM]   $lbl  $(human_kb "${RSS[$i]}") > ${MEM_THRESHOLD_MB}M")
+          echo "[MEM]   $lbl  $(human_kb "${RSS[$i]}") > ${MEM_THRESHOLD_MB}M" >> "$ALERTS_FILE"
         fi
         ;;
     esac
@@ -207,9 +209,9 @@ main() {
     echo "int2dds long-term  |  $HOSTNAME_SHORT  |  $(date '+%F %H:%M')"
     echo "alive ${alive}/${n}   sub-receiving ${recv}/${subs}   mem-max $(human_kb "$memmax") (thr ${MEM_THRESHOLD_MB}M)"
     echo ""
-    if [ "${#ALERTS[@]}" -gt 0 ]; then
+    if [ -s "$ALERTS_FILE" ]; then
       echo "ALERTS:"
-      for a in "${ALERTS[@]}"; do echo "$a"; done
+      cat "$ALERTS_FILE"
     else
       echo "ALERTS: none (all green)"
     fi
