@@ -204,18 +204,24 @@ main() {
   done
 
   # ---- build report ----
-  local R="$WORKDIR/report"
+  # HEAD: mrkdwn bold summary, shown OUTSIDE the code block so Slack renders *bold*.
+  # BODY: monospace table INSIDE a code block - keeps columns aligned and stops
+  #       Slack from italicizing underscore-heavy names like 109_reliable_..._sub.
+  local HEAD="$WORKDIR/head" BODY="$WORKDIR/body"
   {
-    echo "int2dds long-term  |  $HOSTNAME_SHORT  |  $(date '+%F %H:%M')"
-    echo "alive ${alive}/${n}   sub-receiving ${recv}/${subs}   mem-max $(human_kb "$memmax") (thr ${MEM_THRESHOLD_MB}M)"
-    echo ""
+    echo "*int2dds long-term  |  $HOSTNAME_SHORT  |  $(date '+%F %H:%M')*"
+    echo "*alive ${alive}/${n}   sub-receiving ${recv}/${subs}   mem-max $(human_kb "$memmax") (thr ${MEM_THRESHOLD_MB}M)*"
     if [ -s "$ALERTS_FILE" ]; then
-      echo "ALERTS:"
-      cat "$ALERTS_FILE"
+      echo "*ALERTS:*"
     else
-      echo "ALERTS: none (all green)"
+      echo "*ALERTS: none (all green)*"
     fi
-    echo ""
+  } > "$HEAD"
+  {
+    if [ -s "$ALERTS_FILE" ]; then
+      cat "$ALERTS_FILE"
+      echo ""
+    fi
     echo "PROCESSES (test only):"
     free -m 2>/dev/null | awk '/^Mem:/{m=sprintf("Mem %d/%dMB", $3, $2)} /^Swap:/{s=sprintf("Swap %d/%dMB", $3, $2)} END{printf "%s  %s", m, s}'
     echo "  load$(uptime 2>/dev/null | sed 's/.*load average[s]*:/ /')"
@@ -226,10 +232,11 @@ main() {
       printf '%-30s %-4s %-7s %-6s %-7s %s\n' \
         "${M_LABEL[$i]}" "${M_ROLE[$i]}" "${STATUS[$i]}" "${RECV[$i]:--}" "${CPU[$i]:--}" "$rss_h"
     done
-  } > "$R"
+  } > "$BODY"
 
-  post_slack "\`\`\`
-$(cat "$R")
+  post_slack "$(cat "$HEAD")
+\`\`\`
+$(cat "$BODY")
 \`\`\`"
 }
 
