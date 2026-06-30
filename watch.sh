@@ -203,10 +203,17 @@ main() {
     esac
   done
 
+  # elapsed time of the first manifest process (ps etime: [[DD-]HH:]MM:SS)
+  local first_etime="-"
+  if [ -n "${PID[0]:-}" ]; then
+    first_etime="$(ps -o etime= -p "${PID[0]}" 2>/dev/null | awk '{$1=$1; print}')"
+    [ -z "$first_etime" ] && first_etime="-"
+  fi
+
   # ---- build report ----
   local R="$WORKDIR/report"
   {
-    echo "int2dds long-term  |  $HOSTNAME_SHORT  |  $(date '+%F %H:%M')"
+    echo "int2dds long-term  |  $HOSTNAME_SHORT  |  $(date '+%F %H:%M') | $first_etime"
     echo "alive ${alive}/${n}   sub-receiving ${recv}/${subs}   mem-max $(human_kb "$memmax") (thr ${MEM_THRESHOLD_MB}M)"
     echo ""
     if [ -s "$ALERTS_FILE" ]; then
