@@ -16,6 +16,11 @@
 
 set -u
 
+# Force C locale so command output we parse (e.g. `free` labels) stays in
+# English. Under cron, LANG=ko_KR.UTF-8 (from /etc/default/locale) makes
+# `free` print "메모리:"/"스왑:", which broke the /^Mem:/ /^Swap:/ matching.
+export LC_ALL=C
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="${MANIFEST:-$SCRIPT_DIR/manifest.conf}"
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
